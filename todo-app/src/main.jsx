@@ -1,0 +1,375 @@
+const { StrictMode, useState, useEffect } = React;
+const { createRoot } = ReactDOM;
+
+// Veri tipi oluşturucu
+function createTodo(title, description) {
+  return {
+    id: crypto.randomUUID(),
+    title: title.trim(),
+    description: description.trim(),
+    completed: false,
+  };
+}
+
+// Bileşenler
+function TodoForm({ onAdd }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!title.trim()) return;
+
+    const todo = createTodo(title, description);
+    onAdd(todo);
+    setTitle("");
+    setDescription("");
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 bg-slate-50 border border-slate-200 rounded-lg p-4"
+    >
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">
+          Görev Başlığı
+        </label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Örn: Alışveriş yap"
+          className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">
+          Açıklama (opsiyonel)
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Görevle ilgili kısa bir not ekleyin..."
+          rows={3}
+          className="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+        />
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+        >
+          Görev Ekle
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function TodoItem({ todo, onToggleComplete, onDelete, onUpdate }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(todo.title);
+  const [editDescription, setEditDescription] = useState(todo.description);
+
+  const handleSave = () => {
+    if (!editTitle.trim()) return;
+    onUpdate({
+      ...todo,
+      title: editTitle.trim(),
+      description: editDescription.trim(),
+    });
+    setIsEditing(false);
+  };
+
+  return (
+    <li className="flex flex-col sm:flex-row sm:items-start gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex-1">
+        {isEditing ? (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full rounded-md border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              rows={2}
+              className="w-full rounded-md border-slate-300 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+        ) : (
+          <>
+            <h3
+              className={`text-sm font-semibold ${
+                todo.completed ? "line-through text-slate-400" : "text-slate-800"
+              }`}
+            >
+              {todo.title}
+            </h3>
+            {todo.description && (
+              <p className="mt-1 text-sm text-slate-600">{todo.description}</p>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="flex gap-2 justify-end sm:justify-start">
+        <button
+          onClick={() => onToggleComplete(todo.id)}
+          className={`rounded-md px-3 py-1 text-xs font-medium border ${
+            todo.completed
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-slate-50 text-slate-700 border-slate-200"
+          }`}
+        >
+          {todo.completed ? "Yeniden Aç" : "Tamamlandı"}
+        </button>
+        {isEditing ? (
+          <>
+            <button
+              onClick={handleSave}
+              className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
+            >
+              Kaydet
+            </button>
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditTitle(todo.title);
+                setEditDescription(todo.description);
+              }}
+              className="rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200"
+            >
+              Vazgeç
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="rounded-md bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 border border-sky-200"
+          >
+            Düzenle
+          </button>
+        )}
+        <button
+          onClick={() => onDelete(todo.id)}
+          className="rounded-md bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100 border border-rose-200"
+        >
+          Sil
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function TodoList({ todos, onToggleComplete, onDelete, onUpdate }) {
+  if (!todos.length) {
+    return (
+      <p className="text-sm text-slate-500 bg-slate-50 border border-dashed border-slate-300 rounded-lg p-4 text-center">
+        Henüz hiç görev yok. Yukarıdaki formu kullanarak ilk görevinizi ekleyin.
+      </p>
+    );
+  }
+
+  const completedCount = todos.filter((t) => t.completed).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>Toplam: {todos.length}</span>
+        <span>Tamamlanan: {completedCount}</span>
+      </div>
+      <ul className="space-y-3">
+        {todos.map((todo) => (
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            onToggleComplete={onToggleComplete}
+            onDelete={onDelete}
+            onUpdate={onUpdate}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TodoPage() {
+  const [todos, setTodos] = useState(() => {
+    const stored = localStorage.getItem("todos");
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("todos", JSON.stringify(todos));
+  }, [todos]);
+
+  const handleAdd = (todo) => {
+    setTodos((prev) => [todo, ...prev]);
+  };
+
+  const handleToggleComplete = (id) => {
+    setTodos((prev) =>
+      prev.map((todo) =>
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      )
+    );
+  };
+
+  const handleDelete = (id) => {
+    setTodos((prev) => prev.filter((todo) => todo.id !== id));
+  };
+
+  const handleUpdate = (updatedTodo) => {
+    setTodos((prev) =>
+      prev.map((todo) => (todo.id === updatedTodo.id ? updatedTodo : todo))
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <section>
+        <h2 className="text-xl font-semibold text-slate-800 mb-2">
+          Görev Yönetimi
+        </h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Aşağıdaki formu kullanarak yeni görevler ekleyebilir, mevcut görevleri
+          güncelleyebilir veya silebilirsiniz.
+        </p>
+        <TodoForm onAdd={handleAdd} />
+      </section>
+
+      <section className="border-t border-slate-200 pt-4">
+        <h3 className="text-lg font-semibold text-slate-800 mb-3">
+          Görev Listesi
+        </h3>
+        <TodoList
+          todos={todos}
+          onToggleComplete={handleToggleComplete}
+          onDelete={handleDelete}
+          onUpdate={handleUpdate}
+        />
+      </section>
+    </div>
+  );
+}
+
+function AboutPage() {
+  return (
+    <div className="space-y-4">
+      <section>
+        <h2 className="text-xl font-semibold text-slate-800 mb-2">
+          Proje Hakkında
+        </h2>
+        <p className="text-sm text-slate-600">
+          Bu sayfa, ödev yönergesinde istenen &quot;ekstra ekran&quot; için
+          hazırlanmıştır. Modern bir Javascript kütüphanesi olan React ve
+          Tailwind CSS kullanılarak geliştirilmiş bir TODO uygulaması
+          örneğidir.
+        </p>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">
+            Kullanılan Teknolojiler
+          </h3>
+          <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
+            <li>React (CDN üzerinden)</li>
+            <li>ReactDOM</li>
+            <li>Tailwind CSS</li>
+            <li>LocalStorage (veri saklama)</li>
+          </ul>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">
+            Uygulama Özellikleri
+          </h3>
+          <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
+            <li>Görev ekleme</li>
+            <li>Görev listeleme</li>
+            <li>Görev güncelleme (düzenleme)</li>
+            <li>Görev silme</li>
+            <li>Tamamlanan görev sayısını gösterme</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-slate-800 mb-2">
+          Ekran Görüntüsü Notu
+        </h3>
+        <p className="text-sm text-slate-600">
+          Ödevi teslim etmeden önce tarayıcıda uygulamayı açıp bir ekran
+          görüntüsü alarak teslim formuna ekleyebilirsiniz.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+const TABS = {
+  TODO: "TODO",
+  ABOUT: "ABOUT",
+};
+
+function App() {
+  const [activeTab, setActiveTab] = useState(TABS.TODO);
+
+  return (
+    <div className="max-w-4xl mx-auto py-10 px-4">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">
+          Modern TODO Uygulaması
+        </h1>
+        <p className="text-slate-600">
+          React ve Tailwind CSS kullanılarak hazırlanmış basit bir görev
+          yönetimi projesi.
+        </p>
+      </header>
+
+      <nav className="flex gap-2 mb-8 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => setActiveTab(TABS.TODO)}
+          className={`px-4 py-2 rounded-t-md text-sm font-medium ${
+            activeTab === TABS.TODO
+              ? "bg-white border border-b-white border-slate-200 text-indigo-600"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          Görevler
+        </button>
+        <button
+          onClick={() => setActiveTab(TABS.ABOUT)}
+          className={`px-4 py-2 rounded-t-md text-sm font-medium ${
+            activeTab === TABS.ABOUT
+              ? "bg-white border border-b-white border-slate-200 text-indigo-600"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          Hakkında
+        </button>
+      </nav>
+
+      <main className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        {activeTab === TABS.TODO ? <TodoPage /> : <AboutPage />}
+      </main>
+    </div>
+  );
+}
+
+const container = document.getElementById("root");
+const root = createRoot(container);
+
+root.render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+
